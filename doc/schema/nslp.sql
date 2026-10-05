@@ -5,9 +5,19 @@
 CREATE TABLE IF NOT EXISTS t_nslp_case_flow (
   id bigint NOT NULL COMMENT '主键',
   biz_no varchar(64) DEFAULT NULL COMMENT '噪声投诉与超标处置办件的件次',
-  stage int DEFAULT NULL COMMENT '当前关次 0..3（受件/核查/责令/复查收尾）',
-  status int DEFAULT NULL COMMENT '单子走到哪一关 0未起 1在办 2已封住',
-  content varchar(255) DEFAULT NULL COMMENT '一关一记',
+  point_no varchar(64) DEFAULT NULL COMMENT '点位码（立件四样之一；一处点位只许有一条没封住的件）',
+  zone_no varchar(64) DEFAULT NULL COMMENT '所属区册代号（立件四样之一）',
+  spot_count int DEFAULT NULL COMMENT '处数（立件四样之一）',
+  check_reading decimal(12,2) DEFAULT NULL COMMENT '准备折算的那一个核查读数（立件四样之一）',
+  stage int DEFAULT NULL COMMENT '当前关次 0..3（受件/核查/责令/复查收尾），一律后端数出来落库',
+  status int DEFAULT NULL COMMENT '单子走到哪一步 1在办（没封住） 2已收口（封住/撤回/并走/作废）',
+  content varchar(500) DEFAULT NULL COMMENT '本关那一句按语（一关只留头一句，第二句盖不上也不留副本）',
+  note_time datetime DEFAULT NULL COMMENT '头句按语提交的那一刻（收回转进追溯串时照原先后排）',
+  order_received int DEFAULT '0' COMMENT '责令关核收 0未记成 1记成「可」（进复查收尾的门槛；重入责令关从头计）',
+  witness_a varchar(64) DEFAULT NULL COMMENT '复查收尾见证岗甲落笔者',
+  witness_b varchar(64) DEFAULT NULL COMMENT '复查收尾见证岗乙落笔者（须与甲各落一笔）',
+  retest_voucher varchar(128) DEFAULT NULL COMMENT '复测凭证那一串（写回本行才许封）',
+  close_kind int DEFAULT NULL COMMENT '收口种类 1走满末关封住 2反映撤回 3区册并走 4末关作废',
   last_action varchar(64) DEFAULT NULL COMMENT '最近一次挪关动作',
   del_flag int DEFAULT '0' COMMENT '删除标记 0正常 1删除',
   create_by varchar(64) DEFAULT NULL COMMENT '创建者',
@@ -15,8 +25,66 @@ CREATE TABLE IF NOT EXISTS t_nslp_case_flow (
   update_by varchar(64) DEFAULT NULL COMMENT '更新者',
   update_time datetime DEFAULT NULL COMMENT '更新时间',
   remark varchar(500) DEFAULT NULL COMMENT '备注',
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+  KEY idx_case_point_open (point_no, status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='噪声投诉与超标处置办件流转单';
+
+-- 手机端受件草稿：只装敲进来的字与回显的数；报文自带关次只当参考，不参与挪关。
+-- 撤销只可能发生在正式立起来之前；撤掉的条不进主档、不占「没封住」名额。
+CREATE TABLE IF NOT EXISTS t_nslp_case_intake (
+  id bigint NOT NULL COMMENT '主键',
+  point_no varchar(64) DEFAULT NULL COMMENT '点位码（手机端照敲）',
+  zone_no varchar(64) DEFAULT NULL COMMENT '所属区册代号（手机端照敲）',
+  spot_count int DEFAULT NULL COMMENT '处数（手机端回显）',
+  check_reading decimal(12,2) DEFAULT NULL COMMENT '准备折算的核查读数（手机端回显）',
+  ref_stage int DEFAULT NULL COMMENT '报文自带的关次：只当参考，立件、读档都以后端数出来的为准',
+  content varchar(500) DEFAULT NULL COMMENT '反映人敲进来的原话',
+  status int DEFAULT '0' COMMENT '草稿情形 0待立 1已立（已转正式件） 2已撤',
+  case_id bigint DEFAULT NULL COMMENT '立成正式件后那一条的主键',
+  del_flag int DEFAULT '0' COMMENT '删除标记 0正常 1删除',
+  create_by varchar(64) DEFAULT NULL COMMENT '创建者',
+  create_time datetime DEFAULT NULL COMMENT '创建时间',
+  update_by varchar(64) DEFAULT NULL COMMENT '更新者',
+  update_time datetime DEFAULT NULL COMMENT '更新时间',
+  remark varchar(500) DEFAULT NULL COMMENT '备注',
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='噪声办件手机端受件草稿';
+
+-- 按语与收口留痕：每一关那一句按语连着提交那一刻，按时序压在本件身后；
+-- 改档与留痕同一事务，不许先改档后补痕。
+CREATE TABLE IF NOT EXISTS t_nslp_case_note (
+  id bigint NOT NULL COMMENT '主键',
+  case_id bigint NOT NULL COMMENT '所属办件',
+  stage int DEFAULT NULL COMMENT '落按语时所在关次 0..3',
+  note varchar(500) DEFAULT NULL COMMENT '按语原话（收口事件记事件那一句）',
+  note_time datetime DEFAULT NULL COMMENT '按语提交的那一刻（不是转进来的时刻）',
+  log_kind int DEFAULT '0' COMMENT '留痕种类 0关次按语 1封住 2反映撤回 3区册并走 4末关作废',
+  del_flag int DEFAULT '0' COMMENT '删除标记 0正常 1删除',
+  create_by varchar(64) DEFAULT NULL COMMENT '创建者',
+  create_time datetime DEFAULT NULL COMMENT '转进追溯记录的时刻',
+  update_by varchar(64) DEFAULT NULL COMMENT '更新者',
+  update_time datetime DEFAULT NULL COMMENT '更新时间',
+  remark varchar(500) DEFAULT NULL COMMENT '备注',
+  PRIMARY KEY (id),
+  KEY idx_note_case (case_id, note_time, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='噪声办件按语追溯';
+
+-- 受理簿：挪一档记一笔（推进/收回各一笔），同一刻两条通道各送各的，不许并、不许吞。
+CREATE TABLE IF NOT EXISTS t_nslp_case_ledger (
+  id bigint NOT NULL COMMENT '主键',
+  case_id bigint NOT NULL COMMENT '所属办件',
+  from_stage int DEFAULT NULL COMMENT '挪之前关次',
+  to_stage int DEFAULT NULL COMMENT '挪之后关次（必为邻档：+1 或 -1）',
+  move_time datetime DEFAULT NULL COMMENT '这一笔落簿的那一刻',
+  del_flag int DEFAULT '0' COMMENT '删除标记 0正常 1删除',
+  create_by varchar(64) DEFAULT NULL COMMENT '创建者',
+  create_time datetime DEFAULT NULL COMMENT '创建时间',
+  update_by varchar(64) DEFAULT NULL COMMENT '更新者',
+  update_time datetime DEFAULT NULL COMMENT '更新时间',
+  remark varchar(500) DEFAULT NULL COMMENT '备注',
+  PRIMARY KEY (id),
+  KEY idx_ledger_case (case_id, move_time, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='噪声办件受理簿';
 
 CREATE TABLE IF NOT EXISTS t_nslp_doc_tpl (
   id bigint NOT NULL COMMENT '主键',

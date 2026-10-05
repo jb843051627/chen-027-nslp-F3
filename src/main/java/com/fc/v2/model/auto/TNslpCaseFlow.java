@@ -36,20 +36,71 @@ public class TNslpCaseFlow implements Serializable {
     @ApiModelProperty(value = "噪声投诉与超标处置办件的件次")
     private String bizNo;
 
-    /** 当前关次 0..3（受件/核查/责令/复查收尾） */
+    /** 点位码（立件四样之一；一处点位只许有一条没封住的件） */
+    @TableField("point_no")
+    @ApiModelProperty(value = "点位码")
+    private String pointNo;
+
+    /** 所属区册代号（立件四样之一） */
+    @TableField("zone_no")
+    @ApiModelProperty(value = "所属区册代号")
+    private String zoneNo;
+
+    /** 处数（立件四样之一） */
+    @TableField("spot_count")
+    @ApiModelProperty(value = "处数")
+    private Integer spotCount;
+
+    /** 准备折算的那一个核查读数（立件四样之一） */
+    @TableField("check_reading")
+    @ApiModelProperty(value = "准备折算的核查读数")
+    private java.math.BigDecimal checkReading;
+
+    /** 当前关次 0..3（受件/核查/责令/复查收尾），一律后端数出来落库 */
     @TableField("stage")
     @ApiModelProperty(value = "当前关次 0..3（受件/核查/责令/复查收尾）")
     private Integer stage;
 
-    /** 单子走到哪一关 0未起 1在办 2已封住 */
+    /** 单子走到哪一步 1在办（没封住） 2已收口（封住/撤回/并走/作废） */
     @TableField("status")
-    @ApiModelProperty(value = "单子走到哪一关 0未起 1在办 2已封住")
+    @ApiModelProperty(value = "1在办 2已收口")
     private Integer status;
 
-    /** 一关一记 */
+    /** 本关那一句按语（一关只留头一句，第二句盖不上也不留副本） */
     @TableField("content")
-    @ApiModelProperty(value = "一关一记")
+    @ApiModelProperty(value = "本关按语（只留头一句）")
     private String content;
+
+    /** 头句按语提交的那一刻（收回转进追溯串时照原先后排） */
+    @TableField("note_time")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @ApiModelProperty(value = "头句按语提交时刻")
+    private Date noteTime;
+
+    /** 责令关核收 0未记成 1记成「可」（进复查收尾的门槛；重入责令关从头计） */
+    @TableField("order_received")
+    @ApiModelProperty(value = "责令核收是否记成可")
+    private Integer orderReceived;
+
+    /** 复查收尾见证岗甲落笔者 */
+    @TableField("witness_a")
+    @ApiModelProperty(value = "见证岗甲落笔者")
+    private String witnessA;
+
+    /** 复查收尾见证岗乙落笔者（须与甲各落一笔） */
+    @TableField("witness_b")
+    @ApiModelProperty(value = "见证岗乙落笔者")
+    private String witnessB;
+
+    /** 复测凭证那一串（写回本行才许封） */
+    @TableField("retest_voucher")
+    @ApiModelProperty(value = "复测凭证串")
+    private String retestVoucher;
+
+    /** 收口种类 1走满末关封住 2反映撤回 3区册并走 4末关作废 */
+    @TableField("close_kind")
+    @ApiModelProperty(value = "收口种类 1封住 2撤回 3并走 4作废")
+    private Integer closeKind;
 
     /** 最近一次挪关动作 */
     @TableField("last_action")
@@ -104,6 +155,38 @@ public class TNslpCaseFlow implements Serializable {
         this.bizNo = bizNo;
     }
 
+    public String getPointNo() {
+        return pointNo;
+    }
+
+    public void setPointNo(String pointNo) {
+        this.pointNo = pointNo;
+    }
+
+    public String getZoneNo() {
+        return zoneNo;
+    }
+
+    public void setZoneNo(String zoneNo) {
+        this.zoneNo = zoneNo;
+    }
+
+    public Integer getSpotCount() {
+        return spotCount;
+    }
+
+    public void setSpotCount(Integer spotCount) {
+        this.spotCount = spotCount;
+    }
+
+    public java.math.BigDecimal getCheckReading() {
+        return checkReading;
+    }
+
+    public void setCheckReading(java.math.BigDecimal checkReading) {
+        this.checkReading = checkReading;
+    }
+
     public Integer getStage() {
         return stage;
     }
@@ -126,6 +209,54 @@ public class TNslpCaseFlow implements Serializable {
 
     public void setContent(String content) {
         this.content = content;
+    }
+
+    public Date getNoteTime() {
+        return noteTime;
+    }
+
+    public void setNoteTime(Date noteTime) {
+        this.noteTime = noteTime;
+    }
+
+    public Integer getOrderReceived() {
+        return orderReceived;
+    }
+
+    public void setOrderReceived(Integer orderReceived) {
+        this.orderReceived = orderReceived;
+    }
+
+    public String getWitnessA() {
+        return witnessA;
+    }
+
+    public void setWitnessA(String witnessA) {
+        this.witnessA = witnessA;
+    }
+
+    public String getWitnessB() {
+        return witnessB;
+    }
+
+    public void setWitnessB(String witnessB) {
+        this.witnessB = witnessB;
+    }
+
+    public String getRetestVoucher() {
+        return retestVoucher;
+    }
+
+    public void setRetestVoucher(String retestVoucher) {
+        this.retestVoucher = retestVoucher;
+    }
+
+    public Integer getCloseKind() {
+        return closeKind;
+    }
+
+    public void setCloseKind(Integer closeKind) {
+        this.closeKind = closeKind;
     }
 
     public String getLastAction() {
