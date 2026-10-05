@@ -5,18 +5,47 @@
 CREATE TABLE IF NOT EXISTS t_nslp_case_flow (
   id bigint NOT NULL COMMENT '主键',
   biz_no varchar(64) DEFAULT NULL COMMENT '噪声投诉与超标处置办件的件次',
-  stage int DEFAULT NULL COMMENT '当前关次 0..3（受件/核查/责令/复查收尾）',
+  point_no varchar(64) DEFAULT NULL COMMENT '点位码（立件四样之一，一处点位一条）',
+  zone_no varchar(64) DEFAULT NULL COMMENT '所属区册代号（立件四样之一，以底册带出的为准）',
+  occ_num int DEFAULT NULL COMMENT '处数（立件四样之一，至少一处）',
+  check_reading decimal(12,1) DEFAULT NULL COMMENT '准备折算的那一个核查读数（立件四样之一，折算前先取一位小数逢半进一）',
+  stage int DEFAULT NULL COMMENT '当前关次 0..3（受件/核查/责令/复查收尾，关次由后端数，报文自带的只作参考不入库）',
   status int DEFAULT NULL COMMENT '单子走到哪一关 0未起 1在办 2已封住',
-  content varchar(255) DEFAULT NULL COMMENT '一关一记',
+  content varchar(255) DEFAULT NULL COMMENT '本关一句（同一关第二句盖不上去，本行只留头一句）',
   last_action varchar(64) DEFAULT NULL COMMENT '最近一次挪关动作',
+  order_accept varchar(16) DEFAULT NULL COMMENT '责令关核收原话；记成「可」复查收尾才开得了工',
+  witness_a varchar(64) DEFAULT NULL COMMENT '复查收尾见证岗甲落笔（两名各落一笔）',
+  witness_b varchar(64) DEFAULT NULL COMMENT '复查收尾见证岗乙落笔（两名各落一笔）',
+  proof_no varchar(128) DEFAULT NULL COMMENT '复测凭证那一串（封关时写回本行）',
+  note_mask int DEFAULT 0 COMMENT '本趟各关头一句按语位图 bit0..bit3（收回的关腾位，重新挪到从头累计）',
+  close_kind int DEFAULT NULL COMMENT '收口情由 空=走满末关封住 1反映人撤回 2区册并走（后两种视同收口）',
+  void_flag int DEFAULT 0 COMMENT '末关作废 0正常 1已作废（作废的件名册照常露脸，只是不给动手的把手）',
   del_flag int DEFAULT '0' COMMENT '删除标记 0正常 1删除',
   create_by varchar(64) DEFAULT NULL COMMENT '创建者',
   create_time datetime DEFAULT NULL COMMENT '创建时间',
   update_by varchar(64) DEFAULT NULL COMMENT '更新者',
   update_time datetime DEFAULT NULL COMMENT '更新时间',
   remark varchar(500) DEFAULT NULL COMMENT '备注',
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+  KEY idx_point_open (point_no, status, void_flag, del_flag)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='噪声投诉与超标处置办件流转单';
+
+-- 一条办件身后的留痕：每一关那句按语连同提交那一刻，按时序压在本行身后；
+-- 改档与留痕同一事务，日后追经过只取这一串（档数由这一串放出来，不许另算）。
+CREATE TABLE IF NOT EXISTS t_nslp_case_trail (
+  id bigint NOT NULL COMMENT '主键',
+  case_id bigint NOT NULL COMMENT '所随办件 t_nslp_case_flow.id',
+  stage int DEFAULT NULL COMMENT '落笔那一刻办件所处关次 0..3',
+  action varchar(32) DEFAULT NULL COMMENT '动作 受件立条/挪前/收回/按语/封住/反映人撤回/区册并走/作废',
+  note varchar(500) DEFAULT NULL COMMENT '这一笔留下的话（按语原句或动作按语）',
+  trail_time datetime DEFAULT NULL COMMENT '提交那一刻（同刻两笔各记各的先后，按本列排先后不许并成一条）',
+  seq int DEFAULT NULL COMMENT '同刻先后次序（trail_time 并列时以本列断先后）',
+  del_flag int DEFAULT '0' COMMENT '删除标记 0正常 1删除',
+  create_by varchar(64) DEFAULT NULL COMMENT '创建者',
+  create_time datetime DEFAULT NULL COMMENT '创建时间',
+  PRIMARY KEY (id),
+  KEY idx_case_trail (case_id, trail_time, seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='办件流转留痕（一关一句，按时序压在身后）';
 
 CREATE TABLE IF NOT EXISTS t_nslp_doc_tpl (
   id bigint NOT NULL COMMENT '主键',
